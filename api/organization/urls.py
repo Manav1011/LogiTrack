@@ -1,12 +1,8 @@
-from rest_framework.routers import DefaultRouter
+from django.urls import path
+from .views import list_branches, organization_login, branch_login
 
-from core.views import UserViewSet, signup
-from .views import OrganizationViewSet
-from django.urls import path, include
-
-router = DefaultRouter()
-router.register(r'organizations', OrganizationViewSet)
-
-urlpatterns = [	
-	path('', include(router.urls)),
+urlpatterns = [
+    path('login/', organization_login, name='organization_login'),
+    path('branch/login/', branch_login, name='branch_login'),
+    path('branches/', list_branches, name='list_branches'),
 ]

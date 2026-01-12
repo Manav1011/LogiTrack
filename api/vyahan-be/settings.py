@@ -1,4 +1,4 @@
-# drf-yasg Swagger settings for JWT support
+# drf-yasg Swagger settings for Session support
 """
 Django settings for django_batteries_included project.
 
@@ -26,7 +26,12 @@ SECRET_KEY = 'django-insecure-msxxl69&*mw4m*enml1%&x-u0y!=#_*$d6fb(h+1_t2*t%_e9o
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    '.vyahan.local',  # Allow any subdomain of vyahan.local
+    'vyahan.local',   # Allow root domain
+    'localhost',
+    '127.0.0.1',
+]
 
 
 # Application definition
@@ -46,12 +51,16 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware',
-    'django.middleware.common.CommonMiddleware',    
-    'vyahan-be.requestMiddleware.AdminOnlyMiddleware',
-    'organization.middleware.OrganizationMiddleware',
+    "django.middleware.security.SecurityMiddleware",
+    "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.common.CommonMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django.contrib.messages.middleware.MessageMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "organization.middleware.OrganizationMiddleware",
 ]
-SILENCED_SYSTEM_CHECKS = ["admin.E408", "admin.E409", "admin.E410"]
+# SILENCED_SYSTEM_CHECKS = ["admin.E408", "admin.E409", "admin.E410"]
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
@@ -111,24 +120,31 @@ AUTH_PASSWORD_VALIDATORS = [
 
 
 SWAGGER_SETTINGS = {
+    'USE_SESSION_AUTH': True,
     'SECURITY_DEFINITIONS': {
         'Bearer': {
             'type': 'apiKey',
             'name': 'Authorization',
             'in': 'header',
-            'description': 'JWT Authorization header using the Bearer scheme. Example: "Authorization: Bearer {token}"',
+            'description': 'Bearer token authentication. Format: Bearer <token>'
         }
     },
-    'USE_SESSION_AUTH': False,
 }
-# Django REST Framework & JWT settings
+
+from datetime import timedelta
+
 REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': (
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
-    ),
     'DEFAULT_PERMISSION_CLASSES': (
-        'rest_framework.permissions.IsAuthenticated',
+        'rest_framework.permissions.AllowAny',
     ),
+    'EXCEPTION_HANDLER': 'core.utils.custom_exception_handler',
+}
+
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=15),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+    'ALGORITHM': 'HS256',
+    'SIGNING_KEY': SECRET_KEY,
 }
 
 

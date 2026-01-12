@@ -2,5 +2,12 @@ from django.contrib import admin
 from .models import Organization, Branch
 # Register your models here.
 
-admin.site.register(Organization)
-admin.site.register(Branch)
+
+class OrganizationAdmin(admin.ModelAdmin):
+	readonly_fields = ('password',)
+
+class BranchAdmin(admin.ModelAdmin):
+	readonly_fields = ('password',)
+
+admin.site.register(Organization, OrganizationAdmin)
+admin.site.register(Branch, BranchAdmin)

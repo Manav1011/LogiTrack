@@ -1,21 +1,33 @@
-# Generic base response serializer
 from rest_framework import serializers
 from .models import Organization, Branch
-from core.serializers import UserSerializer
-
+from .utils import authenticate_organization, authenticate_branch
 
 class OrganizationSerializer(serializers.ModelSerializer):
-    owners = UserSerializer(many=True, read_only=True)
-    managers = UserSerializer(many=True, read_only=True)
-    
     class Meta:
         model = Organization
-        fields = ['name', 'subdomain', 'metadata', 'owners', 'managers']
-        
+        fields = ['slug', 'title', 'subdomain', 'description', 'metadata']
+
 class BranchSerializer(serializers.ModelSerializer):
     organization = OrganizationSerializer(read_only=True)
-    managers = UserSerializer(many=True, read_only=True)
-    
     class Meta:
         model = Branch
-        fields = ['organization', 'name', 'location', 'managers']
+        fields = ['slug', 'title', 'description', 'metadata', 'organization']
+
+class BranchListRequestSerializer(serializers.Serializer):
+    pass
+
+class BranchListResponseSerializer(serializers.Serializer):
+    """Schema for listing branches response—used only for Swagger documentation."""
+    branches = BranchSerializer(many=True)
+
+class OrganizationLoginSerializer(serializers.Serializer):
+    org_id = serializers.CharField(help_text="Organization ID or slug")
+    password = serializers.CharField(write_only=True)
+
+class BranchLoginSerializer(serializers.Serializer):
+    branch_id = serializers.CharField(help_text="Branch ID or slug")
+    password = serializers.CharField(write_only=True)
+
+class TokenResponseSerializer(serializers.Serializer):
+    access = serializers.CharField()
+    refresh = serializers.CharField()

@@ -1,7 +1,7 @@
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, BaseUserManager
 from django.db import models
 from django.utils import timezone
-from organization.models import Organization
+from .utils import generate_unique_hash
 
 class UserManager(BaseUserManager):
     def create_user(self, email, password=None, **extra_fields):
@@ -36,11 +36,15 @@ class User(AbstractBaseUser, PermissionsMixin):
     def __str__(self):
         return self.email
 
+class BaseModel(models.Model):
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    slug = models.CharField(max_length=32)
+    
+    class Meta:
+        abstract = True
 
-class Profile(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
-    title = models.CharField(max_length=100, blank=True)    
-    role = models.CharField(max_length=50, choices=[
-        ('owner', 'Owner'),
-        ('branch_manager', 'Branch Manager')        
-    ])
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            self.slug = generate_unique_hash()
+        super(BaseModel, self).save(*args, **kwargs)    
