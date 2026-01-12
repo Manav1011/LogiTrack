@@ -16,5 +16,4 @@ class OrganizationMiddleware:
         response = self.get_response(request)
         if organization:
             response.set_cookie('organization_slug', organization.slug)
-        print(organization)
         return response

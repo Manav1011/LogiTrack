@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { UserRole } from '../types';
 import { Navigation, Shield, Store, Search, Lock, AlertCircle, ChevronLeft, Check, Loader2 } from 'lucide-react';
 
 export const Login: React.FC = () => {
   const { login, offices } = useApp();
+  const navigate = useNavigate();
   const [role, setRole] = useState<UserRole | null>(null);
   const [selectedOffice, setSelectedOffice] = useState<string>(offices[0]?.id || '');
   const [password, setPassword] = useState('');
@@ -26,8 +28,11 @@ export const Login: React.FC = () => {
       if (!result.success) {
         setError(result.message);
         setLoading(false);
+      } else {
+        // Explicitly navigate based on role
+        if (role === UserRole.PUBLIC) navigate('/tracking');
+        else navigate('/dashboard');
       }
-      // Success is handled by AppContext state change (currentUser set)
     } catch (err: any) {
       setError("An unexpected error occurred. Please try again.");
       setLoading(false);

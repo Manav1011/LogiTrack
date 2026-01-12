@@ -2,9 +2,11 @@ import React from 'react';
 import { useApp } from '../context/AppContext';
 import { ParcelStatus, UserRole } from '../types';
 import { ArrowRight, Package, Truck, CheckCircle, Clock, TrendingUp } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 export const Dashboard: React.FC = () => {
   const { parcels, currentUser, organization } = useApp();
+  const navigate = useNavigate();
 
   const relevantParcels = currentUser?.role === UserRole.SUPER_ADMIN
     ? parcels
@@ -83,7 +85,7 @@ export const Dashboard: React.FC = () => {
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center">
           <h3 className="font-bold text-slate-800">Recent Shipments</h3>
-          <button className="text-sm text-teal-600 font-semibold hover:text-teal-700">View All</button>
+          <button onClick={() => navigate('/shipments')} className="text-sm text-teal-600 font-semibold hover:text-teal-700">View All</button>
         </div>
 
         {relevantParcels.length === 0 ? (

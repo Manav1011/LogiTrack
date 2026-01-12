@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AppProvider, useApp } from './context/AppContext';
 import { Login } from './views/Login';
 import { Layout } from './components/Layout';
@@ -12,16 +12,7 @@ import { UserRole } from './types';
 
 
 const AppContent = () => {
-  const { currentUser, organization, loading, logout } = useApp();
-  const [currentView, setCurrentView] = useState('dashboard');
-
-
-  // Reset view when user changes (e.g. login/logout)
-  useEffect(() => {
-    if (!currentUser) return;
-    if (currentUser.role === UserRole.PUBLIC) setCurrentView('tracking');
-    else setCurrentView('dashboard');
-  }, [currentUser]);
+  const { currentUser, organization, loading } = useApp();
 
   if (loading) {
     return (
@@ -42,46 +33,48 @@ const AppContent = () => {
     return <Login />;
   }
 
-  const renderView = () => {
-    switch (currentView) {
-      case 'dashboard': return <Dashboard />;
-      case 'offices': return <Offices />;
-      case 'book': return <BookParcel />;
-      case 'parcels': return <ParcelList />;
-      case 'tracking': return <Tracking />;
-      default: return <Dashboard />;
-    }
-  };
-
   // If public user, show a simplified layout or just the view
   if (currentUser.role === UserRole.PUBLIC) {
     return (
-      <div className="min-h-screen bg-slate-50">
-        <header className="bg-white border-b px-6 py-4 flex justify-between items-center">
-          <div className="flex items-center space-x-2 font-bold text-xl text-indigo-900">
-            <span>LogiTrack Public Portal</span>
+      <Routes>
+        <Route path="/tracking" element={
+          <div className="min-h-screen bg-slate-50">
+            <header className="bg-white border-b px-6 py-4 flex justify-between items-center">
+              <div className="flex items-center space-x-2 font-bold text-xl text-indigo-900">
+                <span>LogiTrack Public Portal</span>
+              </div>
+            </header>
+            <main className="p-6">
+              <Tracking />
+            </main>
           </div>
-          <button onClick={() => logout()} className="text-sm text-slate-500 hover:text-indigo-600">Back to Login</button>
-        </header>
-        <main className="p-6">
-          <Tracking />
-        </main>
-      </div>
+        } />
+        <Route path="*" element={<Navigate to="/tracking" replace />} />
+      </Routes>
     );
   }
 
   return (
-    <Layout activeView={currentView} onChangeView={setCurrentView}>
-      {renderView()}
+    <Layout>
+      <Routes>
+        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/offices" element={currentUser.role === UserRole.SUPER_ADMIN ? <Offices /> : <Navigate to="/dashboard" replace />} />
+        <Route path="/book" element={currentUser.role === UserRole.OFFICE_ADMIN ? <BookParcel /> : <Navigate to="/dashboard" replace />} />
+        <Route path="/shipments" element={<ParcelList />} />
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      </Routes>
     </Layout>
   );
 };
 
 const App = () => {
   return (
-    <AppProvider>
-      <AppContent />
-    </AppProvider>
+    <BrowserRouter>
+      <AppProvider>
+        <AppContent />
+      </AppProvider>
+    </BrowserRouter>
   );
 };
 

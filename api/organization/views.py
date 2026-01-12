@@ -11,9 +11,51 @@ from core.authentication import OrganizationJWTAuthentication, BranchJWTAuthenti
 from .serializers import (
     OrganizationSerializer, BranchSerializer, BranchListRequestSerializer, BranchListResponseSerializer,
     OrganizationLoginSerializer, BranchLoginSerializer, TokenResponseSerializer,
-    RefreshTokenSerializer, LogoutSerializer
+    RefreshTokenSerializer, LogoutSerializer, BranchCreateSerializer
 )
 
+
+# open
+@swagger_auto_schema(
+	method='get',
+	responses={200: OrganizationSerializer},
+	operation_description="Check organization health and return details if subdomain is valid.",
+)
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def health_check(request):
+	org = getattr(request, 'organization', None)
+	if not org:
+		return response(status.HTTP_404_NOT_FOUND, "Organization not found")
+	
+	org_serializer = OrganizationSerializer(org)
+	branches = Branch.objects.filter(organization=org)
+	branch_serializer = BranchSerializer(branches, many=True)
+	
+	resp_data = org_serializer.data
+	resp_data['branches'] = branch_serializer.data
+	
+	return response(status.HTTP_200_OK, "Organization is healthy", data=resp_data)
+
+@swagger_auto_schema(
+	method='get',
+	query_serializer=BranchListRequestSerializer,
+	responses={200: BranchListResponseSerializer},
+	operation_description="Get all branches under an organization. (Legacy/Public usage)",
+)
+@api_view(['GET'])
+@permission_classes([IsOrganizationSet])
+def list_branches(request):
+	org = getattr(request, 'organization', None)
+	if not org:
+		return response(status.HTTP_404_NOT_FOUND, "Organization not found")
+	branches = Branch.objects.filter(organization=org)
+	resp_serializer = BranchListResponseSerializer({'branches': branches})
+	return response(status.HTTP_200_OK, "Branches fetched successfully", data=resp_serializer.data)
+
+
+
+# general
 
 @swagger_auto_schema(
 	method='post',
@@ -149,40 +191,89 @@ def branch_login(request):
 	return response(status.HTTP_200_OK, "Branch login successful", data=token_data)
 
 
+# protected
+# Organization Specific
+@swagger_auto_schema(
+	method='post',
+	request_body=BranchCreateSerializer,
+	responses={201: BranchSerializer},
+	operation_description="Create a new branch under the organization. Requires Organization JWT authentication.",
+	security=[{'Bearer': []}]
+)
+@api_view(['POST'])
+@authentication_classes([OrganizationJWTAuthentication])
+@permission_classes([IsOrganizationSet])
+def create_branch(request):
+	org = getattr(request, 'organization', None)
+	if not org:
+		return response(status.HTTP_404_NOT_FOUND, "Organization not found")
+	
+	serializer = BranchCreateSerializer(data=request.data)
+	if serializer.is_valid():
+		branch = serializer.save(organization=org)
+		resp_serializer = BranchSerializer(branch)
+		return response(status.HTTP_201_CREATED, "Branch created successfully", data=resp_serializer.data)
+	return response(status.HTTP_400_BAD_REQUEST, "Invalid data", data=serializer.errors)
+
 @swagger_auto_schema(
 	method='get',
-	query_serializer=BranchListRequestSerializer,
 	responses={200: BranchListResponseSerializer},
-	operation_description="Get all branches under an organization. Requires JWT token authentication.",
+	operation_description="Get all branches under the organization. Requires Organization JWT authentication.",
 	security=[{'Bearer': []}]
 )
 @api_view(['GET'])
+@authentication_classes([OrganizationJWTAuthentication])
 @permission_classes([IsOrganizationSet])
-def list_branches(request):
+def organization_branches_list(request):
 	org = getattr(request, 'organization', None)
 	if not org:
 		return response(status.HTTP_404_NOT_FOUND, "Organization not found")
 	branches = Branch.objects.filter(organization=org)
 	resp_serializer = BranchListResponseSerializer({'branches': branches})
-	return response(status.HTTP_200_OK, "Branches fetched successfully", data=resp_serializer.data)
+	return response(status.HTTP_200_OK, "Organization branches fetched successfully", data=resp_serializer.data)
+
 
 @swagger_auto_schema(
-	method='get',
-	responses={200: OrganizationSerializer},
-	operation_description="Check organization health and return details if subdomain is valid.",
+	method='delete',
+	responses={200: "Branch deleted successfully", 404: "Branch not found"},
+	operation_description="Delete a branch. Requires Organization JWT authentication.",
+	security=[{'Bearer': []}]
 )
-@api_view(['GET'])
-@permission_classes([AllowAny])
-def health_check(request):
+@api_view(['DELETE'])
+@authentication_classes([OrganizationJWTAuthentication])
+@permission_classes([IsOrganizationSet])
+def delete_branch(request, branch_slug):
 	org = getattr(request, 'organization', None)
 	if not org:
 		return response(status.HTTP_404_NOT_FOUND, "Organization not found")
 	
-	org_serializer = OrganizationSerializer(org)
-	branches = Branch.objects.filter(organization=org)
-	branch_serializer = BranchSerializer(branches, many=True)
+	try:
+		branch = Branch.objects.get(organization=org, slug=branch_slug)
+		branch.delete()
+		return response(status.HTTP_200_OK, "Branch deleted successfully")
+	except Branch.DoesNotExist:
+		return response(status.HTTP_404_NOT_FOUND, "Branch not found")
+
+
+# Branch Specific
+@swagger_auto_schema(
+	method='get',
+	responses={200: BranchListResponseSerializer},
+	operation_description="Get all branches in the organization except the authenticated branch. Requires Branch JWT authentication.",
+	security=[{'Bearer': []}]
+)
+@api_view(['GET'])
+@authentication_classes([BranchJWTAuthentication])
+@permission_classes([IsOrganizationSet])
+def branch_transfer_list(request):
+	org = getattr(request, 'organization', None)
+	current_branch = getattr(request, 'branch', None)
 	
-	resp_data = org_serializer.data
-	resp_data['branches'] = branch_serializer.data
-	
-	return response(status.HTTP_200_OK, "Organization is healthy", data=resp_data)
+	if not org:
+		return response(status.HTTP_404_NOT_FOUND, "Organization not found")
+	if not current_branch:
+		return response(status.HTTP_401_UNAUTHORIZED, "Branch context required")
+		
+	branches = Branch.objects.filter(organization=org).exclude(id=current_branch.id)
+	resp_serializer = BranchListResponseSerializer({'branches': branches})
+	return response(status.HTTP_200_OK, "Transfer branches fetched successfully", data=resp_serializer.data)

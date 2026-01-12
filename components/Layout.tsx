@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Navigation,
   LayoutDashboard,
@@ -18,30 +19,36 @@ import { UserRole } from '../types';
 
 interface LayoutProps {
   children: React.ReactNode;
-  activeView: string;
-  onChangeView: (view: string) => void;
 }
 
-export const Layout: React.FC<LayoutProps> = ({ children, activeView, onChangeView }) => {
+export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const { currentUser, logout, notifications, organization } = useApp();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [showNotifications, setShowNotifications] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  const NavItem = ({ view, icon: Icon, label }: { view: string, icon: any, label: string }) => (
-    <button
-      onClick={() => {
-        onChangeView(view);
-        setMobileMenuOpen(false);
-      }}
-      className={`group flex items-center w-full px-4 py-3 text-sm font-medium rounded-lg transition-all mb-1 ${activeView === view
+  const activeView = location.pathname.substring(1) || 'dashboard';
+
+  const NavItem = ({ path, icon: Icon, label }: { path: string, icon: any, label: string }) => {
+    const isActive = location.pathname === path || (path === '/dashboard' && location.pathname === '/');
+
+    return (
+      <button
+        onClick={() => {
+          navigate(path);
+          setMobileMenuOpen(false);
+        }}
+        className={`group flex items-center w-full px-4 py-3 text-sm font-medium rounded-lg transition-all mb-1 ${isActive
           ? 'bg-indigo-600 text-white shadow-md shadow-indigo-900/20'
           : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-        }`}
-    >
-      <Icon className={`w-5 h-5 mr-3 transition-colors ${activeView === view ? 'text-indigo-100' : 'text-slate-500 group-hover:text-slate-300'}`} />
-      <span className="font-sans">{label}</span>
-    </button>
-  );
+          }`}
+      >
+        <Icon className={`w-5 h-5 mr-3 transition-colors ${isActive ? 'text-indigo-100' : 'text-slate-500 group-hover:text-slate-300'}`} />
+        <span className="font-sans">{label}</span>
+      </button>
+    );
+  };
 
   return (
     <div className="min-h-screen flex bg-slate-100 font-sans">
@@ -58,22 +65,22 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeView, onChangeVi
           <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4 px-2 font-brand">Main Menu</div>
           {currentUser?.role === UserRole.SUPER_ADMIN && (
             <>
-              <NavItem view="dashboard" icon={LayoutDashboard} label="Dashboard" />
-              <NavItem view="offices" icon={Building2} label="Offices" />
-              <NavItem view="parcels" icon={ClipboardList} label="Shipments" />
+              <NavItem path="/dashboard" icon={LayoutDashboard} label="Dashboard" />
+              <NavItem path="/offices" icon={Building2} label="Offices" />
+              <NavItem path="/shipments" icon={ClipboardList} label="Shipments" />
             </>
           )}
 
           {currentUser?.role === UserRole.OFFICE_ADMIN && (
             <>
-              <NavItem view="dashboard" icon={LayoutDashboard} label="Dashboard" />
-              <NavItem view="book" icon={PackagePlus} label="New Booking" />
-              <NavItem view="parcels" icon={ClipboardList} label="Shipments" />
+              <NavItem path="/dashboard" icon={LayoutDashboard} label="Dashboard" />
+              <NavItem path="/book" icon={PackagePlus} label="New Booking" />
+              <NavItem path="/shipments" icon={ClipboardList} label="Shipments" />
             </>
           )}
 
           {currentUser?.role === UserRole.PUBLIC && (
-            <NavItem view="tracking" icon={Search} label="Track Parcel" />
+            <NavItem path="/tracking" icon={Search} label="Track Parcel" />
           )}
         </nav>
 
@@ -113,7 +120,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeView, onChangeVi
       {mobileMenuOpen && (
         <div className="md:hidden fixed inset-0 z-10 bg-slate-900 pt-16 px-6">
           <nav className="space-y-2 mt-4">
-            <button onClick={() => { onChangeView('dashboard'); setMobileMenuOpen(false); }} className="block w-full text-left p-4 bg-slate-800 rounded-lg text-white font-medium">Dashboard</button>
+            <button onClick={() => { navigate('/dashboard'); setMobileMenuOpen(false); }} className="block w-full text-left p-4 bg-slate-800 rounded-lg text-white font-medium">Dashboard</button>
             <button onClick={() => { logout(); setMobileMenuOpen(false); }} className="block w-full text-left p-4 text-rose-400 font-medium">Sign Out</button>
           </nav>
         </div>

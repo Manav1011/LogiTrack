@@ -37,3 +37,13 @@ class RefreshTokenSerializer(serializers.Serializer):
 
 class LogoutSerializer(serializers.Serializer):
     refresh = serializers.CharField()
+class BranchCreateSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(write_only=True)
+
+    class Meta:
+        model = Branch
+        fields = ['title', 'description', 'metadata', 'password']
+
+    def create(self, validated_data):
+        # organization will be passed via save(organization=...)
+        return super().create(validated_data)

@@ -3,6 +3,7 @@ import { User, Office, Parcel, ParcelStatus, TrackingEvent, UserRole, Notificati
 import { fetchHealth, fetchBranches, loginOrganization, loginBranch, logoutUser, createApiClient } from '../services/apiService';
 import { jwtDecode } from 'jwt-decode';
 import { useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 
 
@@ -15,7 +16,9 @@ interface AppContextType {
   loading: boolean;
   login: (role: UserRole, credentials: { id?: string, password?: string }) => Promise<{ success: boolean, message: string }>;
   logout: () => Promise<void>;
-  addOffice: (office: Office) => void;
+  addOffice: (officeData: { name: string, password?: string }) => Promise<{ success: boolean, message: string }>;
+  deleteOffice: (officeId: string) => Promise<{ success: boolean, message: string }>;
+  fetchAdminBranches: () => Promise<void>;
   createParcel: (parcel: Omit<Parcel, 'id' | 'trackingId' | 'history' | 'currentStatus' | 'createdAt'>) => void;
   updateParcelStatus: (parcelId: string, newStatus: ParcelStatus, note?: string) => void;
   getOfficeName: (id: string) => string;
@@ -24,25 +27,26 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 // MOCK DATA
-const MOCK_OFFICES: Office[] = [
-  { id: 'off_1', name: 'Central Hub NY', code: 'NYC' },
-  { id: 'off_2', name: 'Boston Branch', code: 'BOS' },
-  { id: 'off_3', name: 'Philly Station', code: 'PHL' },
-];
+const MOCK_OFFICES: Office[] = [];
 
-const MOCK_USERS: User[] = [
-  { id: 'u_1', name: 'Super Admin', role: UserRole.SUPER_ADMIN },
-  { id: 'u_2', name: 'NY Manager', role: UserRole.OFFICE_ADMIN, officeId: 'off_1' },
-  { id: 'u_3', name: 'Boston Manager', role: UserRole.OFFICE_ADMIN, officeId: 'off_2' },
-];
+const MOCK_USERS: User[] = [];
 
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [organization, setOrganization] = useState<any | null>(null);
-  const [offices, setOffices] = useState<Office[]>(MOCK_OFFICES);
+  const [offices, setOffices] = useState<Office[]>([]);
   const [parcels, setParcels] = useState<Parcel[]>([]);
   const [notifications, setNotifications] = useState<NotificationLog[]>([]);
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
+
+  const api = useMemo(() => createApiClient(() => {
+    // Auto logout on unauthorized
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
+    setCurrentUser(null);
+    navigate('/');
+  }), [navigate]);
 
   useEffect(() => {
     const initializeApp = async () => {
@@ -59,8 +63,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           if (healthData.data.branches) {
             mappedOffices = healthData.data.branches.map((b: any) => ({
               id: b.slug,
-              name: b.title,
-              code: b.slug.substring(0, 3).toUpperCase()
+              name: b.title
             }));
             setOffices(mappedOffices);
           }
@@ -81,6 +84,19 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                   officeId: decoded.sub_type === 'branch' ? decoded.sub_id : undefined
                 };
                 setCurrentUser(user);
+
+                // If admin, also fetch the full branch details
+                if (user.role === UserRole.SUPER_ADMIN) {
+                  const adminApi = createApiClient(); // Use local since api useMemo might not be ready in exact same tick
+                  const adminBranches = await adminApi.get('/organization/branches/admin/');
+                  if (adminBranches.status_code === 200) {
+                    const mapped = adminBranches.data.branches.map((b: any) => ({
+                      id: b.slug,
+                      name: b.title
+                    }));
+                    setOffices(mapped);
+                  }
+                }
               } else {
                 localStorage.removeItem('access_token');
                 localStorage.removeItem('refresh_token');
@@ -144,6 +160,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         };
 
         setCurrentUser(user);
+
+        // If admin, refetch branches to get full details
+        if (role === UserRole.SUPER_ADMIN) {
+          await fetchAdminBranches();
+        }
+
         return { success: true, message: data.message };
       }
       else {
@@ -167,10 +189,52 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');
     setCurrentUser(null);
-  }, []);
+    navigate('/');
+  }, [navigate]);
 
-  const addOffice = (office: Office) => {
-    setOffices([...offices, office]);
+  const fetchAdminBranches = useCallback(async () => {
+    try {
+      const data = await api.get('/organization/branches/admin/');
+      if (data.status_code === 200) {
+        const mapped = data.data.branches.map((b: any) => ({
+          id: b.slug,
+          name: b.title
+        }));
+        setOffices(mapped);
+      }
+    } catch (e) {
+      console.error("Failed to fetch admin branches:", e);
+    }
+  }, [api]);
+
+  const addOffice = async (officeData: { name: string, password?: string }) => {
+    try {
+      const data = await api.post('/organization/branches/admin/create/', {
+        title: officeData.name,
+        password: officeData.password || 'default_branch_pass'
+      });
+
+      if (data.status_code === 201) {
+        await fetchAdminBranches(); // Refresh the list
+        return { success: true, message: 'Office created' };
+      }
+      return { success: false, message: data.message || 'Creation failed' };
+    } catch (e: any) {
+      return { success: false, message: e.message || 'Error occurred' };
+    }
+  };
+
+  const deleteOffice = async (officeId: string) => {
+    try {
+      const data = await api.delete(`/organization/branches/admin/${officeId}/delete/`);
+      if (data.status_code === 200) {
+        await fetchAdminBranches();
+        return { success: true, message: 'Office deleted' };
+      }
+      return { success: false, message: data.message || 'Deletion failed' };
+    } catch (e: any) {
+      return { success: false, message: e.message || 'Error occurred' };
+    }
   };
 
   const getOfficeName = (id: string) => offices.find(o => o.id === id)?.name || 'Unknown Office';
@@ -248,6 +312,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       login,
       logout,
       addOffice,
+      deleteOffice,
+      fetchAdminBranches,
       createParcel,
       updateParcelStatus,
       getOfficeName

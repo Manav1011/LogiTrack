@@ -138,6 +138,10 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.AllowAny',
     ),
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        # We handle authentication explicitly in views using decorators
+        # This prevents SessionAuthentication from enforcing CSRF checks
+    ),
     'EXCEPTION_HANDLER': 'core.utils.custom_exception_handler',
 }
 

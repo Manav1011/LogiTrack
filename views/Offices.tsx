@@ -1,20 +1,43 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { Building2, Plus, MapPin, X } from 'lucide-react';
+import { UserRole } from '../types';
+import { Building2, Plus, MapPin, X, Trash2 } from 'lucide-react';
 
 export const Offices: React.FC = () => {
-  const { offices, addOffice } = useApp();
+  const { offices, addOffice, deleteOffice, fetchAdminBranches, currentUser } = useApp();
   const [showForm, setShowForm] = useState(false);
-  const [newOffice, setNewOffice] = useState({ name: '', code: '' });
+  const [loading, setLoading] = useState(false);
+  const [newOffice, setNewOffice] = useState({ name: '', password: '' });
 
-  const handleAdd = (e: React.FormEvent) => {
+  React.useEffect(() => {
+    console.log("Offices component mounted, checking user role...", currentUser?.role);
+    if (currentUser?.role === UserRole.SUPER_ADMIN) {
+      console.log("Triggering fetchAdminBranches...");
+      fetchAdminBranches();
+    }
+  }, [currentUser, fetchAdminBranches]);
+
+  const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
-    addOffice({
-      id: `off_${Date.now()}`,
-      ...newOffice
-    });
-    setNewOffice({ name: '', code: '' });
-    setShowForm(false);
+    setLoading(true);
+    const result = await addOffice(newOffice);
+    setLoading(false);
+
+    if (result.success) {
+      setNewOffice({ name: '', password: '' });
+      setShowForm(false);
+    } else {
+      alert(result.message);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (window.confirm('Are you sure you want to delete this office?')) {
+      setLoading(true);
+      const result = await deleteOffice(id);
+      setLoading(false);
+      if (!result.success) alert(result.message);
+    }
   };
 
   return (
@@ -22,8 +45,9 @@ export const Offices: React.FC = () => {
       <div className="flex justify-between items-center mb-6 pb-6 border-b border-slate-200">
         <h2 className="text-3xl font-bold text-slate-800">Office Network</h2>
         <button
+          disabled={loading}
           onClick={() => setShowForm(!showForm)}
-          className="bg-teal-600 text-white px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-teal-700 flex items-center shadow-sm border border-teal-700"
+          className="bg-teal-600 text-white px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-teal-700 flex items-center shadow-sm border border-teal-700 disabled:opacity-50"
         >
           {showForm ? <X className="w-4 h-4 mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
           {showForm ? 'Close' : 'Add Office'}
@@ -33,7 +57,7 @@ export const Offices: React.FC = () => {
       {showForm && (
         <form onSubmit={handleAdd} className="bg-white p-6 rounded-2xl border border-slate-200 mb-8 shadow-sm">
           <h3 className="font-bold text-slate-800 mb-4 text-lg">Register New Branch</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
             <div>
               <label className="text-xs font-bold text-slate-400 uppercase ml-1">Office Name</label>
               <input
@@ -43,17 +67,19 @@ export const Offices: React.FC = () => {
               />
             </div>
             <div>
-              <label className="text-xs font-bold text-slate-400 uppercase ml-1">Code</label>
+              <label className="text-xs font-bold text-slate-400 uppercase ml-1">Manager Password</label>
               <input
-                placeholder="e.g. WST" required
-                className="w-full p-3 border border-slate-200 rounded-xl text-sm uppercase focus:border-teal-500 outline-none"
-                value={newOffice.code} onChange={e => setNewOffice({ ...newOffice, code: e.target.value })}
+                placeholder="Set password" required type="password"
+                className="w-full p-3 border border-slate-200 rounded-xl text-sm focus:border-teal-500 outline-none"
+                value={newOffice.password} onChange={e => setNewOffice({ ...newOffice, password: e.target.value })}
               />
             </div>
           </div>
           <div className="flex justify-end gap-2 border-t border-slate-100 pt-4">
             <button type="button" onClick={() => setShowForm(false)} className="px-4 py-2 text-sm text-slate-500 hover:text-slate-800 font-medium">Cancel</button>
-            <button type="submit" className="px-6 py-2 bg-teal-600 text-white rounded-lg text-sm font-bold hover:bg-teal-700">Save Office</button>
+            <button type="submit" disabled={loading} className="px-6 py-2 bg-teal-600 text-white rounded-lg text-sm font-bold hover:bg-teal-700 disabled:opacity-50">
+              {loading ? 'Registering...' : 'Save Office'}
+            </button>
           </div>
         </form>
       )}
@@ -65,9 +91,13 @@ export const Offices: React.FC = () => {
               <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl">
                 <Building2 className="w-6 h-6 text-slate-500" />
               </div>
-              <span className="text-xs font-bold bg-teal-50 text-teal-700 px-3 py-1 rounded-lg border border-teal-100">
-                {office.code}
-              </span>
+              <button
+                onClick={() => handleDelete(office.id)}
+                disabled={loading}
+                className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+              >
+                <Trash2 className="w-5 h-5" />
+              </button>
             </div>
             <h3 className="font-bold text-xl mt-4 text-slate-900">{office.name}</h3>
           </div>
