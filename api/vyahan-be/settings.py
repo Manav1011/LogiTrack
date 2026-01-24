@@ -134,6 +134,8 @@ SWAGGER_SETTINGS = {
     },
 }
 
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
 from datetime import timedelta
 
 REST_FRAMEWORK = {
